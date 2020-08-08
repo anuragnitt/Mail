@@ -40,24 +40,24 @@ def send_email(from_mail, passwd, to_mail_list, subject, message_text, message_t
 		server.sendmail(from_mail, mail, message.as_string())
 		server.quit()
 
-uname = os.environ.get('pymail_addr')
-passwd = os.environ.get('pymail_pass')
+uname = 'yourmail@gmail.com'
+passwd = 'your_passwd'
 
-to_mail = ['anuraggoyal.awr@gmail.com']#, '106119014@nitt.edu']
+to_mail = ['''all receivers' list''']
 
 html_text = """\
 		<html>
 		   <head></head>
 		      <body>
 		         <p><b>Hey there!</b><br><br>
-		            Its me, Anurag. This email was sent by an automated python script I wrote.<br><br>
-		            If you like this work, be sure to follow me on <a href=https://www.instagram.com/anurag_goyal.awr>Instagram</a>.
+		            Its me, John Doe. This email was sent by an automated python script I wrote.<br><br>
+		            If you like this work, be sure to follow me on <a href=https://www.instagram.com/username>Instagram</a>.
 		            <br><br>Random files have been attached.
 		         </p>
 		      </body>
 		</html>"""
 
-file_list = ['D:/Photos/Wallpapers/UBUNTU.jpg', 'D:/Documents/Course Files/SEM2/ENDSEM/CHIR11/QP_CHIR11_ENDSEM.pdf']
+file_list = ['''list of all file locations''']
 
 send_email(uname, passwd, to_mail, 'Automated Scipted Mail', html_text, 'html', file_list)
 
