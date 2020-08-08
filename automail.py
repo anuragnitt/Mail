@@ -8,11 +8,11 @@ host = 'smtp.gmail.com'
 SMTP_SSL_PORT = 465
 SMTP_TLS_PORT = 587
 
-username = 'pymailproject2020@gmail.com'
-passwd = 'pymail2020'
+username = 'yourmail@gmail.com'
+passwd = 'your_passwd'
 
 from_mail = username
-to_mail = ['anuraggoyal.aawwrr@gmail.com', 'shanu94301@gmail.com', 'agarwalkartikey21@gmail.com', 'meet1655@gmail.com']
+to_mail = ['''all receivers' list''']
 
 conn = smtplib.SMTP_SSL(host, SMTP_SSL_PORT)
 conn.ehlo()
@@ -32,8 +32,8 @@ for mail in to_mail :
 	   <head></head>
 	      <body>
 	         <p><b>Hey there!</b><br><br>
-	            Its me, Anurag. This email was sent by an automated python script I wrote.<br><br>
-	            If you like this work, be sure to follow me on <a href=https://www.instagram.com/anurag_goyal.awr>Instagram</a>.
+	            Its me, John Doe. This email was sent by an automated python script I wrote.<br><br>
+	            If you like this work, be sure to follow me on <a href=https://www.instagram.com/username>Instagram</a>.
 	         </p>
 	      </body>
 	   </html>"""
