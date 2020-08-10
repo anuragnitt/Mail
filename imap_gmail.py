@@ -50,7 +50,7 @@ def export_inbox(host, port, username, password, fetch_protocol) :
 		dummy_var = input()
 		sys.exit()
 
-	download_dir = os.path.join(os.environ.get('userprofile'), 'Desktop\\{}-INBOX'.format(username))
+	download_dir = os.path.join(os.environ.get('userprofile'), 'Desktop\\{}-INBOX'.format(re.sub('[<>|?*:"/\\\\]', '.', username)))
 
 	check_isdir(download_dir)
 	os.chdir(download_dir)
@@ -99,13 +99,14 @@ def export_inbox(host, port, username, password, fetch_protocol) :
 
 		email_sender = email_info['From']
 		email_sender = re.findall('[^<> ]+@[^<> ]+', email_sender)[0]
+		email_sender = re.sub('[<>|?*:"/\\\\]', '.', email_sender)
 
 		email_receiver = email_info['To']
 		if not bool(email_receiver) :
 			email_receiver = '(empty)'
 
 		email_time = email_info['Date']
-		sub_dirname = dateutil.parser.parse(email_time).astimezone(dateutil.tz.tzlocal()).strftime('%d-%m-%Y_%H-%M-%S')
+		sub_dirname = dateutil.parser.parse(email_time).astimezone(dateutil.tz.tzlocal()).strftime('%d.%m.%Y-%H.%M.%S')
 		sub_dirname = f'{display_value}_{email_sender}_{sub_dirname}'
 		datetime = dateutil.parser.parse(email_time).astimezone(dateutil.tz.tzlocal()).strftime('%d/%m/%Y %X')
 
@@ -118,6 +119,13 @@ def export_inbox(host, port, username, password, fetch_protocol) :
 		for part in disposition :
 
 			filename = part.get_filename()
+			filename = re.sub('[<>|?*:"/\\\\]', '', filename)
+
+			if len(filename) > 255 : # max limit for filename
+				name, ext = os.path.splitext(filename)
+				name = name[:(255 - len(ext))]
+				filename = name + ext
+
 
 			if filename : # 'inline disposition' may or may not have an attachment
 
