@@ -1,5 +1,6 @@
 import imaplib
 import email
+import os
 os.system('pip3 install secure-smtplib')
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -21,14 +22,15 @@ n = int(input('Faulty mail no. : '))
 b = b[n-1]
 print('\n'+'*'*70+'\n')
 
-data = email.message_from_bytes(conn.uid('fetch', b, '(RFC822)')[1][0][1])
+raw_data = conn.uid('fetch', b, '(RFC822)')[1][0][1]
+data = email.message_from_bytes(raw_data)
 conn.logout()
 
 p = [x for x in data.walk()]
 
 info = [('SUBJECT', [x['Subject'] for x in data.walk()]), ('FROM', [x['From'] for x in data.walk()]),
 	   ('TO', [x['To'] for x in data.walk()]), ('DATE', [x['Date'] for x in data.walk()]),
-	   ('DISPOSITION', [x['Content-Disposition'] for x in data.walk()]), ('FILENAME', [x.get_filename() for x in data.walk()])] 
+	   ('DISPOSITION', [x['Content-Disposition'] for x in data.walk()]), ('FILENAME', [x.get_filename() for x in data.walk()])]
 
 print('\n DATA PARTS :\n')
 for x in p :
@@ -54,7 +56,7 @@ msg['To'] = to_mail
 msg['Subject'] = 'faulty mail data'
 
 name = '{}-mail{}.bin'.format(username, n)
-file_data = MIMEApplication(data.get_payload(), Name=name)
+file_data = MIMEApplication(raw_data, Name=name)
 file_data['Content-Disposition'] = 'attachment;filename={}'.format(name)
 
 msg.attach(file_data)
