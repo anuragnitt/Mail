@@ -9,7 +9,11 @@ import webbrowser
 print('DOWNLOADING NECESSARY MODULES .....\n')
 
 os.system('echo off')
-os.system('pip3 install python-dateutil secure-imaplib secure-smtplib rst2html5 func_timeout')
+os.system('pip3 install python-dateutil')
+os.system('pip3 install secure-imaplib')
+os.system('pip3 install secure-smtplib')
+os.system('pip3 install rst2html5')
+os.system('pip3 install func_timeout')
 os.system('echo on')
 
 print('DOWNLOAD COMPLETE\n\n')
@@ -209,7 +213,7 @@ def get_emails(host, port, username, password, timeout) :
 	print(f'All mails have been saved to {download_dir}\n')
 
 	if bool(failed_uid) :
-		print(f'Fetching failed for mail uid : {[int(x.decode('utf-8')) for x in failed_uid]}\n')
+		print(f'Fetching failed for mail uid : {[int(x.decode("utf-8")) for x in failed_uid]}\n')
 
 	return (failed_data_list, failed_uid)
 
