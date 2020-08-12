@@ -3,11 +3,11 @@ import sys
 import re
 import random
 import mimetypes
+import base64
 import email
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-import webbrowser
 
 try :
 	import imaplib
@@ -33,8 +33,85 @@ except ModuleNotFoundError :
 	os.system('pip3 install func_timeout')
 	from func_timeout import func_timeout, FunctionTimedOut
 
+try :
+	from Crypto.Cipher import AES
+	from Crypto.Random import get_random_bytes
+except ModuleNotFoundError :
+	os.system('pip3 install pycryptodome')
+	from Crypto.Cipher import AES
+	from Crypto.Random import get_random_bytes
+
+try :
+	from anonfile.anonfile import AnonFile
+except ModuleNotFoundError :
+	os.system('pip3 install anonfile')
+	from anonfile.anonfile import AnonFile
+
+#######################################################################################################################################
+
 enable_imap_url = 'https://mail.google.com/mail/u/0/#settings/fwdandpop'
 app_access_url = 'https://myaccount.google.com/lesssecureapps'
+
+chunk = 4096
+header = 16
+key_len = 32
+iv_len = 16
+namelen = 3
+
+#######################################################################################################################################
+
+def encrypt(byte_data, key) :
+	key = get_random_bytes(key_len)
+	iv = get_random_bytes(iv_len)
+	print(f'key : {key}\niv  : {iv}')
+
+	org_sz = len(byte_data)
+	pad_sz = chunk - org_sz%chunk
+
+	if org_sz%chunk != 0 :
+		byte_data += (chr(0).encode('utf-8'))*pad_sz
+
+	n_blocks = len(byte_data)//chunk
+
+	engine = AES.new(key, AES.MODE_CBC, iv)
+
+	eb = f'{org_sz:<{header}}'.encode('utf-8')
+	eb += iv
+	for i in range(n_blocks) :
+
+		block = byte_data[:chunk]
+		byte_data = byte_data[chunk:]
+		block = engine.encrypt(block)
+		eb += block
+
+	return eb
+
+#######################################################################################################################################
+
+def decrypt(byte_data, key) :
+
+	org_sz = int(byte_data[:header].decode('utf-8'))
+	byte_data = byte_data[header:]
+
+	iv = byte_data[:iv_len]
+	byte_data = byte_data[iv_len:]
+
+	n_blocks = len(byte_data)//chunk
+
+	engine = AES.new(key, AES.MODE_CBC, iv)
+
+	db = b''
+	for i in range(n_blocks) :
+
+		block = byte_data[:chunk]
+		byte_data = byte_data[chunk:]
+		block = engine.decrypt(block)
+		db += block
+
+	pad_sz = chunk - org_sz%chunk
+	db = db[::-1][pad_sz:][::-1]
+
+	return db
 
 #######################################################################################################################################
 
@@ -45,6 +122,22 @@ def check_isdir(dirname) :
 
 	else :
 		os.mkdir(dirname)
+
+#######################################################################################################################################
+
+def yesno() :
+
+	while True :
+		response = input('(Y/N) : ')
+
+		if response not in ['Y', 'y', 'N', 'n'] :
+			print('\nTry again.')
+			continue
+
+		else :
+			break
+
+		return response
 
 #######################################################################################################################################
 
@@ -170,8 +263,15 @@ def get_emails(host, port, username, password, timeout) :
 	fetch_protocol = '(RFC822)'
 
 	print('\nConnecting to Gmail\'s IMAP server .....')
-	conn = imaplib.IMAP4_SSL(host, port)
-	print('\tConnected.\n')
+	try :
+		conn = smtplib.IMAP4_SSL(host, port)
+		print('\tConnected.\n')
+
+	except socket.gaierror :
+		print('\tCheck your internet connection.\n')
+		print('Restart the program to try again.')
+		sys.exit()
+		dummy_var = input()
 
 	try :
 
@@ -239,8 +339,15 @@ def get_emails(host, port, username, password, timeout) :
 def send_data(host, port, username, password, failed_data_list, developer_mail) :
 
 	print('\nConnecting to Gmail\'s SMTP server .....')
-	conn = smtplib.SMTP_SSL(host, port)
-	print('\tConnected.\n')
+	try :
+		conn = smtplib.SMTP_SSL(host, port)
+		print('\tConnected.\n')
+
+	except socket.gaierror :
+		print('\tCheck your internet connection.\n')
+		print('Restart the program to try again.')
+		sys.exit()
+		dummy_var = input()
 
 	try :
 		print('Attempting to identify with the server ....')
@@ -302,6 +409,7 @@ def main_function() :
 	IMAP_SSL_PORT = 993
 	SMTP_HOST = 'smtp.gmail.com'
 	SMTP_SSL_PORT = 465
+	SMTP_TLS_PORT = 587
 
 	print('Enter your Gmail login credentials.\nDon\'t worry, they will be transferred over an SSL encrypted network.\n')
 
@@ -314,7 +422,7 @@ def main_function() :
 			break
 
 		except ValueError :
-			print('\nTry harder this time. You can do it.')
+			print('\nTry again.')
 			continue
 
 	try :
@@ -329,16 +437,7 @@ def main_function() :
 	if bool(failed_uid) :
 
 		print('Do you want to send the data of failed emails to the developer for analysis ?')
-
-		while True :
-			response = input('(Y/N) : ')
-
-			if response not in ['Y', 'y', 'N', 'n'] :
-				print('\nTry harder this time. You can do it.')
-				continue
-
-			else :
-				break
+		response = yesno()
 
 		if response in ['Y', 'y'] :
 
