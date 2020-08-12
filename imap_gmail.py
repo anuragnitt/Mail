@@ -1,33 +1,40 @@
-import email
 import os
-import re
 import sys
-import mimetypes
+import re
 import random
-import webbrowser
-
-print('DOWNLOADING NECESSARY MODULES .....\n')
-
-os.system('echo off')
-os.system('pip3 install python-dateutil')
-os.system('pip3 install secure-imaplib')
-os.system('pip3 install secure-smtplib')
-os.system('pip3 install rst2html5')
-os.system('pip3 install func_timeout')
-os.system('echo on')
-
-print('DOWNLOAD COMPLETE\n\n')
-print('*'*70 + '\n\n')
-
-#######################################################################################################################################
-
-import imaplib
-import smtplib
-import dateutil.parser
-from func_timeout import func_timeout, FunctionTimedOut
+import mimetypes
+import email
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import webbrowser
+
+try :
+	import imaplib
+except ModuleNotFoundError :
+	os.system('pip3 install secure-imaplib')
+	import imaplib
+
+try :
+	import smtplib
+except ModuleNotFoundError :
+	os.system('pip3 install secure-smtplib')
+	import smtplib
+
+try :
+	import dateutil.parser
+except ModuleNotFoundError :
+	os.system('pip3 install python-dateutil')
+	import dateutil.parser
+
+try :
+	from func_timeout import func_timeout, FunctionTimedOut
+except ModuleNotFoundError :
+	os.system('pip3 install func_timeout')
+	from func_timeout import func_timeout, FunctionTimedOut
+
+enable_imap_url = 'https://mail.google.com/mail/u/0/#settings/fwdandpop'
+app_access_url = 'https://myaccount.google.com/lesssecureapps'
 
 #######################################################################################################################################
 
@@ -43,7 +50,7 @@ def check_isdir(dirname) :
 
 def export_inbox(connection, fetch_uid, fetch_protocol) :
 
-	sp_ch = ['<', '>', '?', '*', ':', '|', '/', '\\', '\r', '\n', '\t', '\b', '\a']
+	sp_ch = ['<', '>', '?', '*', ':', '|', '/', '"', '\\', '\r', '\n', '\t', '\b', '\a']
 
 	success_var, email_data = connection.uid('fetch', fetch_uid, fetch_protocol)
 
@@ -95,7 +102,11 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 	for part in disposition :
 
 		filename = part.get_filename()
-		filename = os.path.basename(filename)
+
+		if filename == None :
+			filename = ''
+		else :
+			filename = os.path.basename(filename)
 
 		filename = ''.join(x for x in filename if not x in sp_ch)
 		name, ext = os.path.splitext(filename)
@@ -104,7 +115,11 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 			ext = mimetypes.guess_extension(part.get_content_type())
 
 		if not name :
-			name = 'untitled-{}'.format(random.randint(0,9999))
+			if 'attachment' in part['Content-Disposition'] :
+				name = 'untitled-attachment-{}'.format(random.randint(0,9999))
+
+			elif 'inline' in part['Content-Disposition'] :
+				name = 'untitled-inline-{}'.format(random.randint(0,999))
 
 		filename = name + ext
 
@@ -169,10 +184,12 @@ def get_emails(host, port, username, password, timeout) :
 		print('\tLogin Failed.\n\nPossible reasons :\n\n\t1. Access to less-secure apps is "turned off" in your Google account\'s settings.\n\n\tResolve here : {}'.format(app_access_url))
 		print('\n\t2. "Enable IMAP" option is turned off in your Gmail settings.\n\n\tResolve here : {}\n\n\t3. You entered invalid credentials.'.format(enable_imap_url))
 		print('\nRestart the program to try again.')
+		sys.exit()
+		dummy_var = input()
 
 	conn.select('INBOX')
 
-	inbox_bytes = conn.uid('search', None, 'ALL')[1][0].split()
+	inbox_bytes = conn.uid('search', None, 'ALL')[1][0].split()[::-1]
 
 	print(f'\tYou have {len(inbox_bytes)} mails in your inbox.\n\n')
 
@@ -245,6 +262,8 @@ def send_data(host, port, username, password, failed_data_list, developer_mail) 
 	except :
 		print('\tLogin Failed.\n\nAccess to less-secure apps might be "turned off" in your Google account\'s settings.\n\n\tResolve here : {}'.format(app_access_url))
 		print('\nRestart the program to try again.')
+		sys.exit()
+		dummy_var = input()
 
 	print('\nGenerating E-Mail .....')
 	message = MIMEMultipart('alternative')
@@ -277,9 +296,6 @@ def send_data(host, port, username, password, failed_data_list, developer_mail) 
 
 def main_function() :
 
-	enable_imap_url = 'https://mail.google.com/mail/u/0/#settings/fwdandpop'
-	app_access_url = 'https://myaccount.google.com/lesssecureapps'
-	python_38 = 'https://www.python.org/ftp/python/3.8.5/python-3.8.5-amd64.exe'
 	dev_mail = 'pymailproject2020@gmail.com'
 
 	IMAP_HOST = 'imap.gmail.com'
