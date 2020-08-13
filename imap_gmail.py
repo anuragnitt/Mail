@@ -8,6 +8,8 @@ import email
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import tkinter
+from tkinter import filedialog
 
 try :
 	import imaplib
@@ -47,12 +49,18 @@ except ModuleNotFoundError :
 	os.system('pip3 install anonfile')
 	from anonfile.anonfile import AnonFile
 
+try :
+	import rst2html5_
+except ModuleNotFoundError :
+	os.system('pip3 install rst2html5')
+	import rst2html5_
+
 #######################################################################################################################################
 
 enable_imap_url = 'https://mail.google.com/mail/u/0/#settings/fwdandpop'
 app_access_url = 'https://myaccount.google.com/lesssecureapps'
 
-chunk = 4096
+chunk = 1024
 header = 16
 key_len = 32
 iv_len = 16
@@ -61,10 +69,8 @@ namelen = 3
 #######################################################################################################################################
 
 def encrypt(byte_data, key) :
-	key = get_random_bytes(key_len)
-	iv = get_random_bytes(iv_len)
-	print(f'key : {key}\niv  : {iv}')
 
+	iv = get_random_bytes(iv_len)
 	org_sz = len(byte_data)
 	pad_sz = chunk - org_sz%chunk
 
@@ -128,16 +134,16 @@ def check_isdir(dirname) :
 def yesno() :
 
 	while True :
-		response = input('(Y/N) : ')
+		response = input('\t(Y/N) : ')
 
 		if response not in ['Y', 'y', 'N', 'n'] :
-			print('\nTry again.')
+			print('\n\tTry again.')
 			continue
 
 		else :
 			break
 
-		return response
+	return response
 
 #######################################################################################################################################
 
@@ -169,6 +175,9 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 		if bool(email_part['Content-Disposition']) :
 			disposition.append(email_part)
 
+		if bool(email_part['Encryption']) :
+			email_info['Encryption'] = email_part['Encryption']
+
 	email_subject = email_info['Subject']
 	if not bool(email_subject) :
 		email_subject = '(no subject)'
@@ -186,6 +195,88 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 	sub_dirname = f'{fetch_uid.decode("utf-8")}_{email_sender}_{sub_dirname}'
 	datetime = dateutil.parser.parse(email_time).astimezone(dateutil.tz.tzlocal()).strftime('%d/%m/%Y %X')
 
+	key = None
+	if bool(email_info['Encryption']) :
+
+		print('\n\tThis E-Mail is secured by encryption.')
+		print(f'\n\tHINTS:\n\t\tSender : {email_sender}\n\t\tSubject : {email_subject}')
+		print('\n\tYou have only 5 attempts to enter the correct password.')
+		print('\tAfter that the E-Mail will be deleted.')
+		print('\n\tBrowse for a key containing file instead (5 attempts) ?')
+		response = yesno()
+
+		if response in ['Y', 'y'] :
+
+			win = tkinter.Tk()
+			win.geometry('200x50')
+			win.title('Non functional window')
+
+			label = tkinter.Label(win, text='IGNORE THIS WINDOW')
+			label.pack()
+
+			for i in range(5) :
+				print(f'\n\t[Attempt {i+1} of 5]')
+				key_path = filedialog.askopenfilename(initialdir=os.environ.get('userprofile'), title='Select the file having the key', filetypes=[('Binary', '*.bin')])
+				with open(key_path, 'rb') as f :
+					key = f.read()
+				#os.remove(key_path)
+				if len(key) == 32 :
+					print('\tKEY ACCEPTED\n\n\tDecrypting .....')
+					break
+				else :
+					print('\tWRONG KEY')
+					key = None
+					continue
+			win.destroy()
+
+		else :
+
+			for i in range(5) :
+				print(f'\n\t[Attempt {i+1} of 5]')
+				anon_id = input('\n\tPASSWORD : ')
+				if len(anon_id) == 15 :
+					a = 1
+					for x in anon_id : a = a*x.isalnum()
+					if a :
+						key_name = anon_id[-5:]
+						anon_id = anon_id[:-5]
+						#api_res = 'temp-{}'.format(random.randint(0,9999))
+						api_handler = AnonFile('api_key')
+						sys.stdout = open(os.devnull, 'w')
+						api_handler.download_file(f'https://anonfiles.com/{anon_id}/{key_name}_bin')
+						sys.stdout = sys.__stdout__
+						#with open(api_res, 'r') as f :
+						#	dl_res = f.read()
+						#os.remove(api_res)
+
+						#if 'Error -- 403: Forbidden' in dl_res :
+						#	print('\tWRONG PASSWORD')
+						#	continue
+						if os.path.exists(f'{key_name}.bin') :
+							with open(f'{key_name}.bin', 'rb') as f :
+								key = f.read()
+							os.remove(f'{key_name}.bin')
+							print('\tPASSWORD ACCEPTED\n\n\tDecrypting .....')
+							break
+						else :
+							print('\tWRONG PASSWORD')
+							continue
+					else :
+						print('\tWRONG PASSWORD')
+						continue
+				else :
+					print('\tWRONG PASSWORD')
+					continue
+
+		if not key :
+			print('\n\tAll attempts failed.\n\tDeleting the E-Mail .....')
+			connection.uid('store', fetch_uid, '+FLAGS', '\\Deleted')
+			connection.expunge()
+			print('\tE-Mail deleted.')
+			return
+
+	# existence of key implies existence of encryption and vice-versa otherwise the function would have quit by now.
+
 	sub_dirname = os.path.join(os.getcwd(), sub_dirname)
 	check_isdir(sub_dirname)
 	os.chdir(sub_dirname)
@@ -200,6 +291,11 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 			filename = ''
 		else :
 			filename = os.path.basename(filename)
+			if key :
+				if filename.endswith('.encrypted') :
+					filename = filename.replace('.encrypted', '')
+				else :
+					print('\nSomeone messed with the mail-sending source.\nAttachment names may be affected.')
 
 		filename = ''.join(x for x in filename if not x in sp_ch)
 		name, ext = os.path.splitext(filename)
@@ -225,7 +321,10 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 		os.chdir(attachment_dir)
 
 		with open(filename, 'wb') as file :
-			file.write(part.get_payload(decode=True))
+			payload = part.get_payload(decode=True)
+			if key :
+				payload = decrypt(payload, key)
+			file.write(payload)
 
 	os.chdir(sub_dirname)
 
@@ -241,20 +340,29 @@ def export_inbox(connection, fetch_uid, fetch_protocol) :
 			if email_part.get_content_maintype() == 'text' :
 
 				if  mimetypes.guess_extension(email_part.get_content_type()) == '.html' :
-					file.write(email_part.get_payload(decode=True))
+					payload = email_part.get_payload(decode=True)
+					if key :
+						payload = base64.b64decode(payload)
+						payload = decrypt(payload, key)
+					file.write(payload)
 
 				elif mimetypes.guess_extension(email_part.get_content_type()) == '.txt' :
 					tmp_name = ''.join(chr(random.randint(97, 122)) for i in range(10))
-					tmp_file = open(tmp_name+'.txt', 'wb')
-					tmp_file.write(email_part.get_payload(decode=True))
+					tmp_file = open(f'{tmp_name}.txt', 'wb')
+					payload = email_part.get_payload(decode=True)
+					if key :
+						payload = base64.b64decode(payload)
+						payload = decrypt(payload, key)
+					tmp_file.write(payload)
 					tmp_file.close()
 
 					os.system('rst2html5 {0}.txt > {0}.html'.format(tmp_name))
-					tmp_file = open(tmp_name+'.html', 'rb')
+					tmp_file = open(f'{tmp_name}.html', 'rb')
 					file.write(tmp_file.read())
 					tmp_file.close()
 
-					os.system('del {0}.txt {0}.html'.format(tmp_name))
+					os.remove(f'{tmp_name}.txt')
+					os.remove(f'{tmp_name}.html')
 
 #######################################################################################################################################
 
@@ -264,7 +372,7 @@ def get_emails(host, port, username, password, timeout) :
 
 	print('\nConnecting to Gmail\'s IMAP server .....')
 	try :
-		conn = smtplib.IMAP4_SSL(host, port)
+		conn = imaplib.IMAP4_SSL(host, port)
 		print('\tConnected.\n')
 
 	except socket.gaierror :
@@ -330,7 +438,7 @@ def get_emails(host, port, username, password, timeout) :
 	print(f'All mails have been saved to {download_dir}\n')
 
 	if bool(failed_uid) :
-		print(f'Fetching failed for mail uid : {[int(x.decode("utf-8")) for x in failed_uid]}\n')
+		print(f'Fetch failure for these mail uid(s) : {[int(x.decode("utf-8")) for x in failed_uid]}\n')
 
 	return (failed_data_list, failed_uid)
 
@@ -341,6 +449,7 @@ def send_data(host, port, username, password, failed_data_list, developer_mail) 
 	print('\nConnecting to Gmail\'s SMTP server .....')
 	try :
 		conn = smtplib.SMTP_SSL(host, port)
+		conn.starttls()
 		print('\tConnected.\n')
 
 	except socket.gaierror :
@@ -378,15 +487,39 @@ def send_data(host, port, username, password, failed_data_list, developer_mail) 
 	message['From'] : username
 	message['To'] : developer_mail
 	message['Subject'] : 'Failed E-Mail data files.'
+	message['Encryption'] : 'encrypted;encryption=AES-256'
+	key = get_random_bytes(32)
 
-	print('\n\tPreparing attachments .....')
+	print('\n\tPreparing encrypted attachments .....')
 	for i in range(len(failed_uid)) :
 
-		name = 'data-{}.bin'.format(failed_uid[i].decode('utf-8'))
-		data = MIMEApplication(failed_data_list[i], Name=name)
+		name = 'data-{}.bin.encrypted'.format(failed_uid[i].decode('utf-8'))
+		data = encrypt(failed_data_list[i], key)
+		data = MIMEApplication(data, Name=name)
 		data['Content-Disposition'] = f'attachment;filename={name}'
-
 		message.attach(data)
+
+	print('\nExporting the encryption key .....')
+	key_name = ''.join(chr(random.randint(97,122)) for i in range(5))
+	with open(f'{key_name}.bin', 'wb') as f :
+		f.write(key)
+	api_handler = AnonFile('api_key')
+	status, file_url = api_handler.upload_file(f'{key_name}.bin')
+
+	if status :
+		print('\tExport successful.')
+		os.remove(f'{key_name}.bin')
+		anon_id = (file_url.split('/')[3] + key_name).encode('utf-8')
+		anon_id = base64.b64encode(anon_id).decode('utf-8')
+		anon_id = MIMEText(anon_id, 'plain')
+		message.attach(anon_id)
+	else :
+		print('\tExport failed. Check your internet connection.') # fails only when offline.
+		export_path = os.path.join(os.environ.env('userprofile'), f'mail-send\\{key_name}.bin')
+		os.rename(f'{key_name}.bin', f'{export_path}')
+		print(f'\tKey saved to "{export_path}"\n\tMail this file to {developer_mail}')
+		dummy_var = input('Press ENTER whenever ready.')
+
 
 	message = message.as_string()
 	print('\n\tE-Mail generated successfully.')
@@ -411,11 +544,12 @@ def main_function() :
 	SMTP_SSL_PORT = 465
 	SMTP_TLS_PORT = 587
 
-	print('Enter your Gmail login credentials.\nDon\'t worry, they will be transferred over an SSL encrypted network.\n')
+	print('!!! Don\'t be offline (even a millisec) throughout !!!\nEnter your Gmail login credentials.\n')
 
 	username = input('Gmail ID : ')
 	password = input('Password : ')
-
+	#timeout = 300
+	print('\nMaximum time to wait before skipping an E-Mail (Recommended - 300sec) ?')
 	while True :
 		try :
 			timeout = int(input('Timeout(sec) : '))
@@ -436,7 +570,8 @@ def main_function() :
 
 	if bool(failed_uid) :
 
-		print('Do you want to send the data of failed emails to the developer for analysis ?')
+		print('\nDo you want to send the data of failed emails to the developer for analysis ?')
+		print('(It will be encrypted while sharing and will be deleted immediately after analysis)')
 		response = yesno()
 
 		if response in ['Y', 'y'] :
