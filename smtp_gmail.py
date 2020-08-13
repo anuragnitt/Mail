@@ -36,7 +36,7 @@ SMTP_HOST = 'smtp.gmail.com'
 SMTP_SSL_PORT = 465
 SMTP_TLS_PORT = 587
 
-chunk = 4096
+chunk = 1024
 header = 16
 key_len = 32
 iv_len = 16
@@ -150,7 +150,7 @@ def send_email(host, port, username, password) :
 
 	message = MIMEMultipart()
 	message['From'] : username
-	message['To'] : ','.join(receiver_list)
+	message['To'] : ', '.join(receiver_list)
 
 	print('\nDo you want the email to be encrypted ?')
 	enc = yesno()
@@ -206,7 +206,7 @@ def send_email(host, port, username, password) :
 		label.pack()
 
 		file_paths = []
-		files = filedialog.askopenfilenames(initialdir=os.getenv('userprofile'), title='Select files to attach')
+		files = filedialog.askopenfilenames(initialdir=os.environ.get('userprofile'), title='Select files to attach')
 		file_paths += list(files)
 
 		while True :
@@ -214,7 +214,7 @@ def send_email(host, port, username, password) :
 			response = yesno()
 
 			if response in ['Y', 'y'] :
-				files = filedialog.askopenfilenames(initialdir=os.getenv('userprofile'), title='Select files to attach')
+				files = filedialog.askopenfilenames(initialdir=os.environ.get('userprofile'), title='Select files to attach')
 				file_paths += list(files)
 				continue
 
@@ -314,18 +314,25 @@ def send_email(host, port, username, password) :
 		dummy_var = input()
 
 	if enc :
-		with open('encryption_key.bin', 'wb') as f :
+		print('\nExporting the encryption key .....')
+		key_name = ''.join(chr(random.randint(97,122)) for i in range(5))
+		with open(f'{key_name}.bin', 'wb') as f :
 			f.write(key)
 		api_handler = AnonFile('api_key')
-		status, file_url = api_handler.upload_file('encryption_key.bin')
-		os.remove('encryption_key.bin')
+		status, file_url = api_handler.upload_file(f'{key_name}.bin')
 
-		if not status :
-			print('\nAn error occured while exporting the encryption key.')
-		else :
-			anon_id = file_url.split('/')[3]
-			print('\n'+'#'*50+f'Password to decrypt the E-Mail : {anon_id}\n'+'#'*50+'\n')
+		if status :
+			print('\tExport successful.')
+			os.remove(f'{key_name}.bin')
+			anon_id = file_url.split('/')[3] + key_name
+			print('\n'+'#'*50+f'\nPassword to decrypt the E-Mail : {anon_id}\n'+'#'*50+'\n')
 			dummy_var = input('Note it down and press ENTER whenever ready.')
+		else :
+			print('\fExport failed. Check your internet connection.') # fails only when offline
+			export_path = os.path.join(os.environ.env('userprofile'), f'mail-send\\{key_name}.bin')
+			os.rename(f'{key_name}.bin', f'{export_path}')
+			print(f'\tKey saved to "{export_path}"\n\tYou\'ll have to securely share this file with the respective receivers.')
+			dummy_var = input('Press ENTER whenever ready.')
 
 	try :
 		print('\nSending E-Mail .....')
@@ -343,7 +350,7 @@ def send_email(host, port, username, password) :
 
 def main_function() :
 
-	print('Enter your Gmail login credentials.\nDon\'t worry, they will be transferred over an SSL encrypted network.\n')
+	print('!!! Don\'t be offline (even a millisec) throughout !!!\nEnter your Gmail login credentials.\n')
 	username = input('Gmail ID : ')
 	password = input('Password : ')
 
