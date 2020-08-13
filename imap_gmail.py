@@ -425,7 +425,8 @@ def get_emails(host, port, username, password, timeout) :
 	for uid in [x.decode('utf-8') for x in failed_uid] :
 		for folder in os.listdir('.') :
 			if uid in folder :
-				os.system(f'echo y | rmdir /s {folder}')
+				os.system(f'echo y | rmdir /s {folder}') # Windows
+				#os.system(f'sudo rm -r {folder}') # Linux
 
 	failed_data_list = [conn.uid('fetch', uid, fetch_protocol)[1][0][1] for uid in failed_uid]		
 
